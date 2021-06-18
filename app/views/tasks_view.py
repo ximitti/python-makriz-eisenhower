@@ -3,6 +3,8 @@ from http import HTTPStatus
 
 from app.models import TasksModel
 
+from app.services.helpers import eisenhower_classification
+
 # ---------------------------------
 
 bp: Blueprint = Blueprint("bp_tasks", __name__)
@@ -15,6 +17,8 @@ def create_task():
     session = current_app.db.session
 
     payload = request.get_json()
+
+    payload["eisenhower_id"] = eisenhower_classification(payload.get("importance"), payload.get("urgency"))
 
     task: TasksModel = TasksModel(**payload)
 

@@ -16,6 +16,6 @@ class TasksModel(db.Model):
     importance = Column(Integer)
     urgency = Column(Integer)
 
-    eisenhower_id = Column(Integer, ForeignKey("eisenhowers.id"), nullable=False, unique=True)
+    eisenhower_id = Column(Integer, ForeignKey("eisenhowers.id"), nullable=False)
 
     eisenhower = relationship("EisenhowersModel", backref=backref("task"))
