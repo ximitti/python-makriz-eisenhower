@@ -1,9 +1,10 @@
-from flask import Blueprint, request, current_app
+from flask import Blueprint, request
 from http import HTTPStatus
+from sqlalchemy.exc import IntegrityError
 
-from app.models import TasksModel
+from app.exc import InvalidOptionsError, MissingKeysError, RequiredKeysError
 
-from app.services.helpers import eisenhower_classification
+from app.services.task_service import create_task
 
 # ---------------------------------
 
@@ -13,22 +14,19 @@ bp: Blueprint = Blueprint("bp_tasks", __name__)
 
 
 @bp.post("/task")
-def create_task():
-    session = current_app.db.session
+def register_task():
 
-    payload = request.get_json()
+    try:
+        return create_task(request.get_json()), HTTPStatus.CREATED
 
-    payload["eisenhower_id"] = eisenhower_classification(payload.get("importance"), payload.get("urgency"))
+    except IntegrityError as e:
+        return {"error": f"duplicate key: {e.params['name']}"}, HTTPStatus.BAD_REQUEST
 
-    task: TasksModel = TasksModel(**payload)
+    except InvalidOptionsError as e:
+        return e.message
 
-    session.add(task)
-    session.commit()
+    except MissingKeysError as e:
+        return e.message
 
-    return {
-        "id": task.id,
-        "name": task.name,
-        "description": task.description,
-        "duration": task.duration,
-        "eisenhower_classification": task.eisenhower.type,
-    }, HTTPStatus.CREATED
+    except RequiredKeysError as e:
+        return e.message

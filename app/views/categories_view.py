@@ -1,8 +1,10 @@
-from flask import Blueprint, request, current_app, jsonify
+from flask import Blueprint, request, jsonify
 from http import HTTPStatus
-from ipdb import set_trace
+from sqlalchemy.exc import IntegrityError
 
-from app.models import CategoriesModel, TasksModel, TasksCategoriesModel as TCM
+from app.exc import MissingKeysError, RequiredKeysError
+
+from app.services.category_service import create_category, select_categories
 
 
 # --------------------------------------
@@ -13,42 +15,22 @@ bp: Blueprint = Blueprint("bp_categories", __name__)
 
 
 @bp.post("/category")
-def create_category():
-    session = current_app.db.session
+def register_category():
 
-    payload = request.get_json()
+    try:
+        return create_category(request.get_json()), HTTPStatus.CREATED
 
-    category: CategoriesModel = CategoriesModel(**payload)
+    except IntegrityError as e:
+        return {"error": f"duplicate key: {e.params['name']}"}, HTTPStatus.BAD_REQUEST
 
-    session.add(category)
-    session.commit()
+    except MissingKeysError as e:
+        return e.message
 
-    return {"id": category.id, "name": category.name, "description": category.description}, HTTPStatus.CREATED
+    except RequiredKeysError as e:
+        return e.message
 
 
 @bp.get("/")
 def get_all():
-    session = current_app.db.session
 
-    category_list: list[CategoriesModel] = session.query(CategoriesModel).all()
-
-    task_list: list[tuple[CategoriesModel, TasksModel]] = (
-        session.query(CategoriesModel, TasksModel).select_from(CategoriesModel).join(TCM).join(TasksModel).all()
-    )
-
-    output = [
-        {
-            "category": {
-                "name": category.name,
-                "description": category.description,
-                "task": [
-                    {"name": task.name, "description": task.description, "priority": task.eisenhower.type}
-                    for cat, task in task_list
-                    if cat.id == category.id
-                ],
-            }
-        }
-        for category in category_list
-    ]
-
-    return jsonify(output)
+    return jsonify(select_categories()), HTTPStatus.OK
